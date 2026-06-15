@@ -1,0 +1,63 @@
+# Artifacts (generated at runtime)
+artifacts/
+
+# Datasets (large CSVs — keep out of version control)
+datasets/
+*.csv
+
+# Jupyter
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# Saved models / serialized objects
+*.pkl
+*.joblib
+*.h5
+*.model
+
+# Environment / secrets
+.env
+*.env
+
+# IDEs / editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+ehthumbs.db
+desktop.ini
+.DS_Store
+
+# Logs & temp
+*.log
+*.tmp
+tmp/
+temp/
+
+# Distribution / build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
