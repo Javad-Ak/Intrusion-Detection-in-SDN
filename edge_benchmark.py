@@ -17,23 +17,30 @@ print("Initiating Hardware-Constrained Edge Simulation...")
 print("Constraints: 1.0 CPU Core | 512 MB RAM")
 print("==================================================\n")
 
-class Deep1DCNN(nn.Module):
+class HeavyHybridDL(nn.Module):
     def __init__(self, num_classes=3):
-        super(Deep1DCNN, self).__init__()
-        self.net = nn.Sequential(
-            nn.Conv1d(1, 16, kernel_size=3, padding=1),
-            nn.BatchNorm1d(16),
+        super(HeavyHybridDL, self).__init__()
+        self.conv_block = nn.Sequential(
+            nn.Conv1d(1, 64, kernel_size=3, padding=1),
+            nn.BatchNorm1d(64),
             nn.ReLU(),
             nn.MaxPool1d(2),
-            nn.Conv1d(16, 32, kernel_size=3, padding=1),
-            nn.BatchNorm1d(32),
+            nn.Conv1d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm1d(128),
             nn.ReLU(),
-            nn.AdaptiveMaxPool1d(1),
-            nn.Flatten(),
+            nn.AdaptiveMaxPool1d(10)
+        )
+        self.lstm = nn.LSTM(input_size=128, hidden_size=64, num_layers=2, batch_first=True)
+        self.fc = nn.Sequential(
+            nn.Linear(64, 32),
+            nn.ReLU(),
             nn.Linear(32, num_classes)
         )
     def forward(self, x):
-        return self.net(x)
+        x = self.conv_block(x)
+        x = x.permute(0, 2, 1)
+        lstm_out, _ = self.lstm(x)
+        return self.fc(lstm_out[:, -1, :])
 
 def load_data():
     print("Loading serialized test splits...")
@@ -41,7 +48,6 @@ def load_data():
     if not data_path.exists():
         raise FileNotFoundError("test_splits.pkl not found! Run the Jupyter Notebook Phase 5 first.")
     
-    # Load the exact test sets used in the main notebook
     X_test_red, X_test_scaled, y_test = joblib.load(data_path)
     return X_test_red, X_test_scaled, y_test
 
@@ -50,7 +56,7 @@ def streaming_benchmark(name, model, X_test_df, y_test_arr, phase_name):
     preds = []
     start_infer = time.perf_counter()
     
-    if 'CNN' in name:
+    if 'PyTorch' in name:
         model.eval()
         with torch.no_grad():
             for i in range(0, len(X_test_df), MICRO_BATCH_SIZE):
@@ -66,8 +72,8 @@ def streaming_benchmark(name, model, X_test_df, y_test_arr, phase_name):
     
     latency_us = (infer_time / len(X_test_df)) * 1e6
     pps = len(X_test_df) / infer_time
-    acc = accuracy_score(y_test_arr, preds)
-    macro_f1 = f1_score(y_test_arr, preds, average='macro')
+    acc = float(accuracy_score(y_test_arr, preds))
+    macro_f1 = float(f1_score(y_test_arr, preds, average='macro'))
     
     print(f"  -> Latency: {latency_us:.2f} us/sample | Throughput: {int(pps)} PPS | F1: {macro_f1:.4f}\n")
     
@@ -89,7 +95,7 @@ def main():
 
     results = []
     
-    # Define the models we expect to find
+    # Matches notebook dict exactly
     classical_models = ['Decision_Tree', 'Random_Forest', 'XGBoost', 'LightGBM']
     
     # Benchmark Reduced Models
@@ -97,9 +103,7 @@ def main():
         model_path = MODELS_DIR / f"{name}_reduced.pkl"
         if model_path.exists():
             model = joblib.load(model_path)
-            res = streaming_benchmark(f"{name.replace('_', ' ')} (Tuned)", model, X_test_red, y_test, 'Reduced (Consensus XAI)')
-            
-            # Add size dynamically
+            res = streaming_benchmark(f"{name.replace('_', ' ')}", model, X_test_red, y_test, 'Reduced (Consensus XAI)')
             res['Model Size (KB)'] = round(os.path.getsize(model_path) / 1024, 1)
             results.append(res)
             
@@ -111,15 +115,14 @@ def main():
         res['Model Size (KB)'] = round(os.path.getsize(mlp_path) / 1024, 1)
         results.append(res)
         
-    cnn_path = MODELS_DIR / "1D_CNN_PyTorch.pth"
+    cnn_path = MODELS_DIR / "CNN-LSTM_PyTorch.pth"
     if cnn_path.exists():
-        cnn = Deep1DCNN(num_classes=len(np.unique(y_test)))
+        cnn = HeavyHybridDL(num_classes=len(np.unique(y_test)))
         cnn.load_state_dict(torch.load(cnn_path, weights_only=True))
-        res = streaming_benchmark('1D CNN (PyTorch)', cnn, X_test_scaled, y_test, 'Full Baseline (Heavy)')
+        res = streaming_benchmark('CNN-LSTM (PyTorch)', cnn, X_test_scaled, y_test, 'Full Baseline (Heavy)')
         res['Model Size (KB)'] = round(os.path.getsize(cnn_path) / 1024, 1)
         results.append(res)
 
-    # Save final stress-test metrics
     df_results = pd.DataFrame(results)
     df_results.to_csv(ARTIFACTS_DIR / 'docker_stress_test_results.csv', index=False)
     print("\nSimulation Complete. Results saved to artifacts/docker_stress_test_results.csv")

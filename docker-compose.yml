@@ -5,6 +5,7 @@ services:
     build: .
     volumes:
       - ./artifacts:/app/artifacts
+      - ./edge_benchmark.py:/app/edge_benchmark.py
     deploy:
       resources:
         limits:
