@@ -21,7 +21,7 @@ This repository implements an ultra-lightweight, high-throughput, and fully inte
 ## 📊 Hardware-Constrained Edge Benchmarks
 The following empirical metrics were evaluated within the Docker container simulation environments under strict resource quotas (**1.0 CPU Core Limit | 512MB RAM Limit**):
 
-| Model Architecture | Feature Subspace Phase | Latency / Sample (µs) | Throughput (PPS) | Accuracy | Macro-$F_1$ | Model Size (KB) |
+| Model Architecture | Feature Subspace Phase | Latency / Sample (µs) | Throughput (PPS) | Accuracy | Macro-F_1 | Model Size (KB) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Decision Tree (Tuned)** | Reduced (Consensus XAI) | **37.20** | **26,880** | 0.9973 | **0.9030** | **319.1** |
 | **LightGBM (Tuned)** | Reduced (Consensus XAI) | 127.73 | 7,828 | 0.9974 | 0.8621 | 10,543.3 |
