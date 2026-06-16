@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  edge-controller-sim:
+    build: .
+    volumes:
+      - ./artifacts:/app/artifacts
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'      # Hard-capped to exactly 1 CPU core
+          memory: 512M     # Hard-capped to 512 Megabytes of RAM
