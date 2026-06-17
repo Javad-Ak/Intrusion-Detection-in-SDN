@@ -1,46 +1,42 @@
-# Ultra-Lightweight and Interpretable Intrusion Detection in SDN
-**A Consensus XAI-Driven Feature Reduction Framework**
+# Lightweight and Interpretable Intrusion Detection in SDN
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
-[![Docker](https://img.shields.io/badge/docker-enabled-blue.svg)](https://www.docker.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+**Author:** Mohammad Javad Akbari
 
-> **Author:** Mohammad Javad Akbari
+> An offline feature-space reduction framework using consensus values from SHAP and LIME to significantly decrease computing overhead, latency, and memory residency for Intrusion Detection Systems (IDS) in Software-Defined Networks (SDN).
 
-## 📖 Abstract
-Modern network architectures increasingly rely on Software-Defined Networking (SDN) to decouple the control logic from data forwarding planes. However, this centralization introduces severe security risks. Existing Network Intrusion Detection Systems (NIDS) frequently deploy heavy Deep Learning (DL) architectures that induce high computational overhead and unacceptable latency. 
+## 📌 Overview
 
-This repository implements an ultra-lightweight, high-throughput, and fully interpretable NIDS pipeline. By leveraging a **Dual-XAI (SHAP + LIME) consensus mechanism** for dimensionality reduction, I systematically eliminate non-informative flow features and deploy classical machine learning classifiers directly optimized for resource-constrained SDN edge controllers.
+Software-Defined Networking (SDN) isolates control logic from the forwarding plane, shifting the processing burden to a centralized controller. Running complex deep learning architectures for packet inspection on this plane introduces notable processing bottlenecks. This project solves this by combining global **SHAP** parameters with localized **LIME** samples to optimize classical Machine Learning structures and a position-agnostic Tabular Fully Convolutional Network (FCN), forcing a pragmatic trade-off between slight accuracy degradation and massive throughput gains.
 
-## ✨ Key Features
-* **Zero-Leakage Data Pipeline:** Strict 70/15/15 stratified splitting ensuring zero mathematical leakage during scaling or XAI feature selection.
-* **Dual-XAI Consensus:** Utilizes both Global (SHAP) and Local (LIME) attributions, verified via a Jaccard Similarity Index.
-* **Dynamic Dimensionality Cutoff:** Uses a 95% Cumulative Variance "Elbow Method" to prevent arbitrary feature thresholding.
-* **Hardware-Constrained Micro-Benchmarking:** Includes a Dockerized edge-controller simulation hard-capped to 1 CPU core and 512MB RAM to prove real-world viability against heavy DL architectures (e.g., CNN-LSTM).
+## ⚙️ Methodology Pipeline
 
-## 📊 Hardware-Constrained Edge Benchmarks
-The following empirical metrics were evaluated within the Docker container simulation environments under strict resource quotas (**1.0 CPU Core Limit | 512MB RAM Limit**):
+1. **Chronological Data Ingestion:** Merges InSDN and CSE-CIC-IDS2018 datasets, sorted strictly temporally (no shuffling) to prevent temporal data leakage.
+2. **Dual-XAI Consensus Mapping:** Extracts global behaviors via SHAP and local boundaries via LIME (isolated strictly to the validation fold) to generate a unified consensus vector for feature selection.
+3. **Reduced Space Execution:** Symmetrically retrains the models strictly on the reduced feature subspace to ensure a purely feature-based evaluation.
+4. **Hardware-Constrained Benchmarking:** Evaluates operational viability using a simulated, resource-constrained Docker micro-batching environment.
 
-| Model Architecture | Feature Subspace Phase | Latency / Sample (µs) | Throughput (PPS) | Accuracy | Macro-F_1 | Model Size (KB) |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Decision Tree (Tuned)** | Reduced (Consensus XAI) | **37.20** | **26,880** | 0.9973 | **0.9030** | **319.1** |
-| **LightGBM (Tuned)** | Reduced (Consensus XAI) | 127.73 | 7,828 | 0.9974 | 0.8621 | 10,543.3 |
-| **XGBoost (Tuned)** | Reduced (Consensus XAI) | 135.91 | 7,357 | 0.9979 | 0.8979 | 3,915.3 |
-| **Random Forest (Tuned)** | Reduced (Consensus XAI) | 137.58 | 7,268 | 0.9977 | 0.9024 | 14,260.0 |
-| **CNN-LSTM (PyTorch)** | Full Baseline (Heavy) | 631.34 | 1,583 | 0.9966 | 0.8131 | 443.4 |
-| **MLP (DL Baseline)** | Full Baseline (Heavy) | 639.98 | 1,562 | 0.9972 | 0.8059 | 4,831.7 |
+## 📊 Key Results
 
-### 📈 Key Analytics
-* **Speedup & Throughput Acceleration:** The Consensus XAI-driven Decision Tree runs **16.9x faster per sample** than the hybrid CNN-LSTM network, processing an extra **25,297 packets per second** under identical core limitations.
-* **Metric Integrity Protection:** This massive latency mitigation was achieved with *no cost to accuracy*, actually expanding the macro-$F_1$ boundary from **0.8131 (CNN-LSTM)** to **0.9030 (Decision Tree)** due to the elimination of noisy, non-informative flow attributes.
+The consensus feature reduction framework achieved up to a **~91% increase in throughput** and a **~47% reduction in processing latency** for heavier architectures, with only minor, acceptable degradations in detection accuracy.
 
-## 🗂️ Repository Structure
-```text
-.
-├── datasets/                 # Place InSDN and CSE-CIC-IDS2018 CSVs here
-├── artifacts/                # Output models, figures, and benchmark CSVs
-├── NIDS_Pipeline.ipynb       # Main training and feature reduction pipeline
-├── edge_benchmark.py         # Throttled micro-batch streaming script
-├── requirements.txt          # Python dependencies
-├── Dockerfile                # Edge-controller simulation environment
-└── docker-compose.yml        # Hardware constraint configurations
+### Performance vs. Resource Trade-off (Full vs. Reduced)
+
+| Model | Phase | Accuracy | Macro-F1 | Throughput (PPS) | Latency (ms/batch) |
+| --- | --- | --- | --- | --- | --- |
+| **Tabular FCN PyTorch** | Full | 0.9939 | 0.8022 | 11,333.0 | 88.23 |
+| **Tabular FCN PyTorch** | **Reduced** | 0.9622 | 0.7374 | **21,732.0** | **46.01** |
+| **XGBoost** | Full | 0.9988 | 0.8938 | 4,963.0 | 201.47 |
+| **XGBoost** | **Reduced** | 0.9956 | 0.8978 | **9,519.0** | **105.05** |
+| **Decision Tree** | Full | 0.9982 | 0.8562 | 22,143.0 | 45.16 |
+| **Decision Tree** | **Reduced** | 0.9947 | 0.8797 | **26,520.0** | **37.71** |
+
+### Relative Hardware Impact (Consensus Feature Reduction)
+
+| Model | Latency Change | Throughput Change |
+| --- | --- | --- |
+| **Tabular FCN PyTorch** | **-47.85%** | **+91.76%** |
+| **XGBoost** | **-47.86%** | **+91.80%** |
+| **MLP DL Baseline** | -19.37% | +24.05% |
+| **Decision Tree** | -16.50% | +19.77% |
+| **LightGBM** | +3.54% | -3.42% |
+| **Random Forest** | +0.25% | -0.26% |
