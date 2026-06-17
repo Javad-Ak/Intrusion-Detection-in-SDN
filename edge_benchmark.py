@@ -18,6 +18,13 @@ print("Executing Isolated Local Controller Evaluation...")
 print("Resource Parameters: 1.0 Allocated CPU Core | 512 MB RAM Limit")
 print("==================================================\n")
 
+def get_safe_name(name):
+    """
+    Matches the string replacement logic from the main notebook to ensure 
+    artifact names map correctly during load.
+    """
+    return name.replace(' ', '_').replace('(', '').replace(')', '').replace('/', '_')
+
 class TabularFCN(nn.Module):
     """
     Unified Tabular FCN architecture.
@@ -60,7 +67,7 @@ def streaming_benchmark(name, model, X_test_df, y_test_arr, phase_name):
     
     X_test_arr = X_test_df.values
     total_samples = len(X_test_arr)
-    total_batches = np.ceil(total_samples / MICRO_BATCH_SIZE)
+    total_batches = int(np.ceil(total_samples / MICRO_BATCH_SIZE))
     
     start_infer = time.perf_counter()
     
@@ -79,8 +86,8 @@ def streaming_benchmark(name, model, X_test_df, y_test_arr, phase_name):
     infer_time = time.perf_counter() - start_infer
     
     # Compute metrics mapped to expected notebook plot variables
-    latency_ms_per_batch = (infer_time * 1000) / total_batches
-    pps = total_samples / infer_time
+    latency_ms_per_batch = (infer_time * 1000) / total_batches if total_batches > 0 else 0
+    pps = total_samples / infer_time if infer_time > 0 else 0
     acc = float(accuracy_score(y_test_arr, preds))
     macro_f1 = float(f1_score(y_test_arr, preds, average='macro'))
     
@@ -99,19 +106,23 @@ def main():
     try:
         X_test_red, X_test_scaled, y_test = load_data()
     except Exception as e:
-        print(e)
+        print(f"Data mapping error: {e}")
         return
 
     results = []
-    target_classifiers = ['Decision_Tree', 'Random_Forest', 'XGBoost', 'LightGBM', 'MLP_DL_Baseline']
+    
+    # Using the original dictionary keys from the notebook to loop, parsing safe names dynamically
+    target_classifiers = ['Decision Tree', 'Random Forest', 'XGBoost', 'LightGBM', 'MLP (DL Baseline)']
     num_classes = len(np.unique(y_test))
     
-    # 1. Evaluate Full Baseline
+    # Phase 1: Evaluate Full Baseline
+    print("\n--- Initiating Phase: Full Baseline ---\n")
     for name in target_classifiers:
-        model_path = MODELS_DIR / f"{name}_full.pkl"
+        safe_name = get_safe_name(name)
+        model_path = MODELS_DIR / f"{safe_name}_full.pkl"
         if model_path.exists():
             model = joblib.load(model_path)
-            res = streaming_benchmark(f"{name.replace('_', ' ')}", model, X_test_scaled, y_test, 'Full_Baseline')
+            res = streaming_benchmark(name, model, X_test_scaled, y_test, 'Full_Baseline')
             res['Model Size (KB)'] = round(model_path.stat().st_size / 1024, 1)
             results.append(res)
 
@@ -123,12 +134,14 @@ def main():
         res['Model Size (KB)'] = round(torch_full_path.stat().st_size / 1024, 1)
         results.append(res)
         
-    # 2. Evaluate Reduced Feature Space
+    # Phase 2: Evaluate Reduced Feature Space
+    print("\n--- Initiating Phase: Reduced Consensus Space ---\n")
     for name in target_classifiers:
-        model_path = MODELS_DIR / f"{name}_reduced.pkl"
+        safe_name = get_safe_name(name)
+        model_path = MODELS_DIR / f"{safe_name}_reduced.pkl"
         if model_path.exists():
             model = joblib.load(model_path)
-            res = streaming_benchmark(f"{name.replace('_', ' ')}", model, X_test_red, y_test, 'Reduced_Space')
+            res = streaming_benchmark(name, model, X_test_red, y_test, 'Reduced_Space')
             res['Model Size (KB)'] = round(model_path.stat().st_size / 1024, 1)
             results.append(res)
 
@@ -140,6 +153,7 @@ def main():
         res['Model Size (KB)'] = round(torch_red_path.stat().st_size / 1024, 1)
         results.append(res)
 
+    # Save output telemetry
     df_results = pd.DataFrame(results)
     df_results.to_csv(ARTIFACTS_DIR / 'docker_stress_test_results.csv', index=False)
     print("\nTelemetry Tracking Complete. Output dataset saved to artifacts/docker_stress_test_results.csv")
